@@ -53,8 +53,8 @@ class TumorSegmentationTask(MetaTask):
     def forward(self, x):
         last_features, backbone_features = self.backbone.forward_backbone_features(x)
         last_features = self.backbone.forward_neck(last_features)
-        mask_pred = self.heads['mask'](last_features)
-        label_pred = self.heads['label'](backbone_features)
+        mask_pred = self.heads['mask'](backbone_features)
+        label_pred = self.heads['label'](last_features)
         return mask_pred, label_pred
 
     def forward_with_gt(self, batch):

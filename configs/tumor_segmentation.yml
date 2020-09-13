@@ -74,10 +74,11 @@ data:
       path_to_datalist: "data_train.csv"
     transform:
       - &normalize
-        name: Normalize
-        params:
-          mean: [ 0.5 ]
-          std: [ 0.5 ]
+#        name: Normalize
+#        params:
+#          mean: [ 0.5 ]
+#          std: [ 0.5 ]
+        name: InstanceNormalize
       - &totensor
         name: ToTensorV2
     augment:
@@ -124,9 +125,10 @@ data:
       path_to_datalist: "data_valid.csv"
     transform:
 #      - *pad
-      - *resize
       - *normalize
       - *totensor
+    augment:
+      - *resize
 
 trainer:
   gpus: 0
@@ -138,7 +140,7 @@ trainer:
   precision: 16
 
 logger:
-  save_dir: "logs/cancer_segmentator"
+  save_dir: "logs/tumor_segmentator"
   name: unet_effnet_b0
 
 checkpoint:

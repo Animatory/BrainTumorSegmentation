@@ -125,9 +125,11 @@ data:
       path_to_datalist: "data_valid.csv"
     transform:
 #      - *pad
-      - *resize
       - *normalize
       - *totensor
+    augment:
+      - *resize
+
 
 trainer:
   gpus: 0

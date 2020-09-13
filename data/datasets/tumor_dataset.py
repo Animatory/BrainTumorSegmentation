@@ -28,8 +28,10 @@ class TumorDataset(BaseDataset):
 
         if image.ndim == 2:
             image = image[..., None]
-        if image.dtype == 'int16':
-            image = (image / (2 ** 8)).astype('uint8')
+        # if image.dtype == 'int16':
+        #     image = (image / (2 ** 8)).astype('uint8')
+        if image.dtype == 'uint8':
+            image = (image.astype(float) * (2 ** 8)).astype('int16')
         mask = mask
 
         # apply augmentations
