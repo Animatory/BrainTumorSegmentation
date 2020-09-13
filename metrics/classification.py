@@ -25,7 +25,8 @@ class AccuracyMeter(Metric):
 class FbetaMeter(Metric):
     MODES = ['macro', 'binary']
 
-    def __init__(self, num_classes, name=None, get_logits=False, average='macro', beta=1, target_fields=None):
+    def __init__(self, num_classes, name=None, get_logits=False, average='macro',
+                 target_class=None, beta=1, target_fields=None):
         if name is None:
             name = f'F_beta={beta}_{average}'
 
@@ -43,18 +44,31 @@ class FbetaMeter(Metric):
         self.beta_sq = beta ** 2
         self.num_classes = num_classes
         self.mode = average
+        self.target_class = target_class
         self.get_logits = get_logits
-        self.true_pos = np.zeros(self.num_classes)
-        self.false_pos = np.zeros(self.num_classes)
-        self.false_neg = np.zeros(self.num_classes)
 
-    def calculate(self, target: ndarray, prediction: ndarray) -> ndarray:
+        if target_class is None:
+            self.true_pos = np.zeros(self.num_classes)
+            self.false_pos = np.zeros(self.num_classes)
+            self.false_neg = np.zeros(self.num_classes)
+        else:
+            self.true_pos = 0
+            self.false_pos = 0
+            self.false_neg = 0
+
+    def calculate(self, target: ndarray, prediction: ndarray) -> (ndarray,ndarray):
         """ Usage on mini-batch is deprecated """
         if prediction.ndim == target.ndim + 1:
             prediction = prediction.argmax(1)
 
         f1_scores = np.zeros(self.num_classes)
-        for n in range(self.num_classes):
+
+        if self.target_class is None:
+            to_iterate = range(self.num_classes)
+        else:
+            to_iterate = [self.target_class]
+
+        for n in to_iterate:
             true_n = target == n
             pred_n = prediction == n
             tp = (pred_n & true_n).sum()
@@ -79,17 +93,31 @@ class FbetaMeter(Metric):
 
         if prediction.ndim == target.ndim + 1:
             prediction = prediction.argmax(1)
-        for n in range(self.num_classes):
+
+        if self.target_class is None:
+            for n in range(self.num_classes):
+                true_n = target == n
+                pred_n = prediction == n
+                self.true_pos[n] += (pred_n & true_n).sum()
+                self.false_pos[n] += (pred_n & ~true_n).sum()
+                self.false_neg[n] += (true_n & ~pred_n).sum()
+        else:
+            n = self.target_class
             true_n = target == n
             pred_n = prediction == n
-            self.true_pos[n] += (pred_n & true_n).sum()
-            self.false_pos[n] += (pred_n & ~true_n).sum()
-            self.false_neg[n] += (true_n & ~pred_n).sum()
+            self.true_pos += (pred_n & true_n).sum()
+            self.false_pos += (pred_n & ~true_n).sum()
+            self.false_neg += (true_n & ~pred_n).sum()
 
     def reset(self):
-        self.true_pos = np.zeros(self.num_classes)
-        self.false_pos = np.zeros(self.num_classes)
-        self.false_neg = np.zeros(self.num_classes)
+        if self.target_class is None:
+            self.true_pos = np.zeros(self.num_classes)
+            self.false_pos = np.zeros(self.num_classes)
+            self.false_neg = np.zeros(self.num_classes)
+        else:
+            self.true_pos = 0
+            self.false_pos = 0
+            self.false_neg = 0
 
     def on_epoch_end(self):
         if self.mode == 'binary':
@@ -97,9 +125,14 @@ class FbetaMeter(Metric):
             fp = self.false_pos[1]
             fn = self.false_neg[1]
         elif self.mode == 'macro':
-            tp = self.true_pos.sum()
-            fp = self.false_pos.sum()
-            fn = self.false_neg.sum()
+            if self.target_class is None:
+                tp = self.true_pos.sum()
+                fp = self.false_pos.sum()
+                fn = self.false_neg.sum()
+            else:
+                tp = self.true_pos
+                fp = self.false_pos
+                fn = self.false_neg
         tp_rate = (1 + self.beta_sq) * tp
         denum = tp_rate + self.beta_sq * fn + fp
         if denum == 0.0:
@@ -113,12 +146,13 @@ class FbetaMeter(Metric):
 @METRICS.register_class
 class F1Meter(FbetaMeter):
 
-    def __init__(self, num_classes, name=None, get_logits=False, average='macro', target_fields=None):
+    def __init__(self, num_classes, name=None, get_logits=False,
+                 average='macro', target_class=None, target_fields=None):
         if name is None:
             name = f'F1_{average}'
 
-        super().__init__(num_classes, name=name, get_logits=get_logits,
-                         average=average, beta=1, target_fields=target_fields)
+        super().__init__(num_classes, name=name, get_logits=get_logits, average=average,
+                         target_class=target_class, beta=1, target_fields=target_fields)
 
 
 @METRICS.register_class
