@@ -1,0 +1,33 @@
+name: training_pipeline
+channels:
+  - pytorch
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.7
+  - pip
+  - pydantic
+  - pyyaml
+  - pytorch
+  - torchvision
+  - cudatoolkit
+  - pytorch-lightning
+  - nvidia-apex
+  - numpy
+  - pandas
+  - scikit-learn
+  - pillow
+  - opencv
+  - albumentations
+  - tqdm
+  - matplotlib
+  - seaborn
+  - jupyterlab
+  - ipywidgets
+  - ipympl
+  - jupyter_contrib_nbextensions
+  - graphviz
+  - pip:
+      - torchsummary
+      - parameterized
+      - hiddenlayer
