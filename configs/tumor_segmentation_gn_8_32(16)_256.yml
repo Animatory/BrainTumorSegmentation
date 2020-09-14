@@ -14,8 +14,7 @@ task:
         name: mask
         params:
           num_classes: 1
-          attention_type: scse
-    use_ema: true
+    use_ema: false
     input_size: [*num_channels, &height 256, &width 256]
 
 criterion:
@@ -63,7 +62,8 @@ data:
   dataset_name: TumorDataset
   common_params:
     data_folder: "../data"
-    input_dtype: float16
+    input_dtype: float32
+    image_dtype: uint8
   dataloader_params:
     batch_size: 16
     num_workers: 8
@@ -125,11 +125,9 @@ data:
       path_to_datalist: "data_valid.csv"
     transform:
 #      - *pad
+      - *resize
       - *normalize
       - *totensor
-    augment:
-      - *resize
-
 
 trainer:
   gpus: 0
@@ -141,8 +139,8 @@ trainer:
   precision: 16
 
 logger:
-  save_dir: "logs/tumor_segmentator"
-  name: unet_effnet_b0_attn_ema
+  save_dir: "logs/cancer_segmentator"
+  name: unet_effnet_b0
 
 checkpoint:
   monitor: valid/loss
@@ -152,9 +150,6 @@ checkpoint:
 profiler:
   name: simple
   save_profile: false
-
-#restore:
-#  checkpoint: 'logs/tumor_segmentator/unet_effnet_b0_attn_ema/2020-09-12_15-16-41/last.ckpt'
 
 metrics:
   - name: IntersectionOverUnionMeter
@@ -175,9 +170,3 @@ metrics:
       target_fields:
         target: target_label
         prediction: prediction_label
-
-
-
-
-
-

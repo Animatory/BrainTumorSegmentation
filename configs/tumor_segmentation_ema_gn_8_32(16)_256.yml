@@ -14,7 +14,8 @@ task:
         name: mask
         params:
           num_classes: 1
-    use_ema: false
+          attention_type: scse
+    use_ema: true
     input_size: [*num_channels, &height 256, &width 256]
 
 criterion:
@@ -62,7 +63,8 @@ data:
   dataset_name: TumorDataset
   common_params:
     data_folder: "../data"
-    input_dtype: float16
+    input_dtype: float32
+    image_dtype: uint8
   dataloader_params:
     batch_size: 16
     num_workers: 8
@@ -74,11 +76,10 @@ data:
       path_to_datalist: "data_train.csv"
     transform:
       - &normalize
-#        name: Normalize
-#        params:
-#          mean: [ 0.5 ]
-#          std: [ 0.5 ]
-        name: InstanceNormalize
+        name: Normalize
+        params:
+          mean: [ 0.5 ]
+          std: [ 0.5 ]
       - &totensor
         name: ToTensorV2
     augment:
@@ -125,10 +126,9 @@ data:
       path_to_datalist: "data_valid.csv"
     transform:
 #      - *pad
+      - *resize
       - *normalize
       - *totensor
-    augment:
-      - *resize
 
 trainer:
   gpus: 0
@@ -141,7 +141,7 @@ trainer:
 
 logger:
   save_dir: "logs/tumor_segmentator"
-  name: unet_effnet_b0
+  name: unet_effnet_b0_attn_ema
 
 checkpoint:
   monitor: valid/loss
@@ -151,6 +151,9 @@ checkpoint:
 profiler:
   name: simple
   save_profile: false
+
+#restore:
+#  checkpoint: 'logs/tumor_segmentator/unet_effnet_b0_attn_ema/2020-09-12_15-16-41/last.ckpt'
 
 metrics:
   - name: IntersectionOverUnionMeter
@@ -171,9 +174,3 @@ metrics:
       target_fields:
         target: target_label
         prediction: prediction_label
-
-
-
-
-
-

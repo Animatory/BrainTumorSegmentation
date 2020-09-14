@@ -1,0 +1,195 @@
+task:
+  name: TumorSegmentationTask
+  params:
+    backbone_name: efficientnet_b0
+    backbone_params:
+      in_chans: &num_channels 1
+      pretrained: true
+    heads:
+      - type: ClassificationHead
+        name: label
+        params:
+          num_classes: 3
+      - type: Unet
+        name: mask
+        params:
+          num_classes: 1
+          attention_type: scse
+    use_ema: true
+    input_size: [*num_channels, &height 256, &width 256]
+
+criterion:
+  criterion_list:
+    - name: DiceLoss
+      params:
+        mode: binary
+        target_fields:
+          target: target_mask
+          input: prediction_mask
+    - name: LovaszLoss
+      params:
+        mode: binary
+        target_fields:
+          target: target_mask
+          input: prediction_mask
+    - name: BCEWithLogitsLoss
+      params:
+        target_fields:
+          target: target_mask
+          input: prediction_mask
+
+    - name: CrossEntropyLoss
+      params:
+        target_fields:
+          target: target_label
+          input: prediction_label
+
+optimizer:
+  name: SGD
+  params:
+    lr: &initial_lr 0.03
+    weight_decay: 0.00005
+    momentum: 0.9
+    nesterov: true
+
+scheduler:
+  name: CosineAnnealingWarmRestarts
+  params:
+    T_0: 5
+    T_mult: 2
+
+data:
+  dataset_name: TumorDataset
+  common_params:
+    data_folder: "../data"
+    input_dtype: float32
+    image_dtype: int16
+  dataloader_params:
+    batch_size: 16
+    num_workers: 8
+    shuffle: true
+    drop_last: false
+
+  train_params:
+    params:
+      path_to_datalist: "data_train.csv"
+    transform:
+      - &normalize
+        name: InstanceNormalize
+      - &totensor
+        name: ToTensorV2
+    augment:
+      - name: VerticalFlip
+      - name: ShiftScaleRotate
+        params:
+          scale_limit: 0.3
+          rotate_limit: 90
+          shift_limit: 0.1
+          border_mode: 0
+          mask_value: 0
+          value: 0
+          p: 0.8
+      - name: RandomResizedCrop
+        params:
+          height: *height
+          width: *width
+          scale: [0.5, 1.0]
+          p: 0.5
+      - &resize
+        name: Resize
+        params:
+          height: *height
+          width: *width
+      - name: OneOf
+        params:
+          transforms:
+            - name: ElasticTransform
+              params:
+                alpha_affine: 0.05
+            - name: GridDistortion
+              params:
+                distort_limit: 0.2
+          p: 0.7
+
+  valid_params:
+    params:
+      path_to_datalist: "data_valid.csv"
+    transform:
+#      - *pad
+      - *normalize
+      - *totensor
+    augment:
+      - *resize
+
+
+trainer:
+  gpus: 0
+  max_epochs: 150
+  train_percent_check: 1
+  val_percent_check: 1
+  progress_bar_refresh_rate: 200
+  check_val_every_n_epoch: 1
+  precision: 16
+
+logger:
+  save_dir: "logs"
+  name: unet_effnetb0_in_float32_s256_attn_ema
+
+checkpoint:
+  monitor: valid/loss
+  save_last: true
+  mode: min
+
+profiler:
+  name: simple
+  save_profile: false
+
+#restore:
+#  checkpoint: 'logs/tumor_segmentator/unet_effnet_b0_attn_ema/2020-09-12_15-16-41/last.ckpt'
+
+metrics:
+  - name: IntersectionOverUnionMeter
+    params:
+      name: IoU_mask
+      target_class: 1
+      average: global
+      binary_mod: true
+      target_fields:
+        target: target_mask
+        prediction: prediction_mask
+
+  - name: F1Meter
+    params:
+      name: f1_meningioma
+      target_class: 0
+      get_logits: true
+      num_classes: 3
+      target_fields:
+        target: target_label
+        prediction: prediction_label
+
+  - name: F1Meter
+    params:
+      name: f1_glioma
+      target_class: 1
+      get_logits: true
+      num_classes: 3
+      target_fields:
+        target: target_label
+        prediction: prediction_label
+
+  - name: F1Meter
+    params:
+      name: f1_pituitary_tumor
+      target_class: 2
+      get_logits: true
+      num_classes: 3
+      target_fields:
+        target: target_label
+        prediction: prediction_label
+
+
+
+
+
+
