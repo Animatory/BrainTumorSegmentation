@@ -1,2 +1,2 @@
-from . import hrnet, unet
+from . import hrnet, unet, deeplabv3plus
 
