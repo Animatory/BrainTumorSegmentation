@@ -11,25 +11,27 @@ from registry import DATASETS
 class BRATSDataset(BaseDataset):
 
     def __init__(self, data_folder, path_to_datalist,
-                 augment=None, transform=None, input_dtype='float32'):
+                 augment=None, transform=None,
+                 input_dtype='float32', label_dtype='long'):
         self.data_folder = Path(data_folder)
         self.csv = pd.read_csv(self.data_folder / path_to_datalist)
         self.csv['path'] = self.csv['path'].apply(lambda x: self.data_folder / x)
         self.input_dtype = input_dtype
+        self.label_dtype = label_dtype
 
         self.augment = augment
         self.transform = transform
 
     def get_raw(self, i):
         record = self.csv.iloc[i]
-        opened, _ = load(record.path)
-        mask, _ = load(record.label_path)
-        index = record.index
+        opened, _ = load(str(record.path))
+        mask, _ = load(str(record.label_path))
+        index = int(record.ind)
 
-        if record.view == 0:
+        if int(record.v) == 0:
             image = opened[index, :, :]
             mask = mask[index, :, :]
-        elif record.view == 1:
+        elif int(record.v) == 1:
             image = opened[:, index, :]
             mask = mask[:, index, :]
         else:
@@ -54,6 +56,7 @@ class BRATSDataset(BaseDataset):
             sample = self.transform(image=image, mask=mask)
             image, mask = sample['image'], sample['mask']
         image = image.type(torch.__dict__[self.input_dtype])
+        mask = mask.type(torch.__dict__[self.label_dtype])
 
         return {"input": image, "target_mask": mask}
 
