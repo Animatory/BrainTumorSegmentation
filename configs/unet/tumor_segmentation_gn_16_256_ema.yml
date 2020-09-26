@@ -140,7 +140,7 @@ trainer:
   precision: 16
 
 logger:
-  save_dir: "logs/tumor_segmentator"
+  save_dir: "logs"
   name: unet_effnet_b0_attn_ema
 
 checkpoint:

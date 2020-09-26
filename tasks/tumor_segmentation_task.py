@@ -42,6 +42,8 @@ class TumorSegmentationTask(MetaTask):
             self.heads[head_name] = HEADS.get(head_type)(**head_params)
             self.head_tasks[head_name] = head_task
 
+        self.has_label = 'label' in self.head_tasks
+
         if 'checkpoint' in task_params and task_params.get('load_first', False):
             state_dict = torch.load(task_params['checkpoint'])['state_dict']
             print(self.load_state_dict(state_dict, strict=False))
@@ -54,21 +56,25 @@ class TumorSegmentationTask(MetaTask):
         last_features, backbone_features = self.backbone.forward_backbone_features(x)
         last_features = self.backbone.forward_neck(last_features)
         mask_pred = self.heads['mask'](backbone_features)
-        label_pred = self.heads['label'](last_features)
-        return mask_pred, label_pred
+        if self.has_label:
+            label_pred = self.heads['label'](last_features)
+            return mask_pred, label_pred
+        else:
+            return mask_pred
 
     def forward_with_gt(self, batch):
         output = {}
         input_data = batch['input']
         last_features, backbone_features = self.backbone.forward_backbone_features(input_data)
-        label_out = self.heads['label'](self.backbone.forward_neck(last_features))
-        mask_out = self.heads['mask'](backbone_features)
 
+        mask_out = self.heads['mask'](backbone_features)
         output[f'prediction_mask'] = mask_out
         output[f'target_mask'] = batch['target_mask']
 
-        output[f'prediction_label'] = label_out
-        output[f'target_label'] = batch['target_label']
+        if self.has_label:
+            label_out = self.heads['label'](self.backbone.forward_neck(last_features))
+            output[f'prediction_label'] = label_out
+            output[f'target_label'] = batch['target_label']
 
         return output
 
