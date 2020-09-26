@@ -54,9 +54,8 @@ class BRATSDataset(BaseDataset):
             sample = self.transform(image=image, mask=mask)
             image, mask = sample['image'], sample['mask']
         image = image.type(torch.__dict__[self.input_dtype])
-        mask = mask.type(torch.__dict__[self.input_dtype])
 
-        return {"input": image, "mask": mask.float()}
+        return {"input": image, "target_mask": mask}
 
     def __len__(self):
         return len(self.csv)

@@ -17,17 +17,17 @@ criterion:
   criterion_list:
     - name: DiceLoss
       params:
-        mode: binary
+        mode: multiclass
         target_fields:
           target: target_mask
           input: prediction_mask
     - name: LovaszLoss
       params:
-        mode: binary
+        mode: multiclass
         target_fields:
           target: target_mask
           input: prediction_mask
-    - name: BCEWithLogitsLoss
+    - name: CrossEntropyLoss
       params:
         target_fields:
           target: target_mask
@@ -63,7 +63,7 @@ data:
     params:
       path_to_datalist: "data_train_brats.csv"
     transform:
-       - &normalize
+      - &normalize
         name: InstanceNormalize
       - &totensor
         name: ToTensorV2
