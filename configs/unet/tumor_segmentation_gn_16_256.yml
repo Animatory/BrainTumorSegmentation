@@ -155,8 +155,8 @@ metrics:
   - name: IntersectionOverUnionMeter
     params:
       name: IoU_mask
-      average: global
       binary_mod: true
+      average: global
       target_fields:
         target: target_mask
         prediction: prediction_mask
@@ -181,6 +181,14 @@ metrics:
     params:
       name: f1_pituitary_tumor
       target_class: 2
+      target_fields:
+        target: target_label
+        prediction: prediction_label
+
+  - name: F1Meter
+    params:
+      name: f1_label
+      num_classes: 3
       target_fields:
         target: target_label
         prediction: prediction_label

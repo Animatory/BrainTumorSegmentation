@@ -10,12 +10,12 @@ task:
         name: label
         params:
           num_classes: 3
-      - type: Unet
+      - type: DeepLabV3Plus
         name: mask
         params:
           num_classes: 1
     use_ema: false
-    input_size: [*num_channels, &height 512, &width 512]
+    input_size: [*num_channels, &height 256, &width 256]
 
 criterion:
   criterion_list:
@@ -125,13 +125,13 @@ trainer:
   max_epochs: 150
   train_percent_check: 1
   val_percent_check: 1
-  progress_bar_refresh_rate: 200
+  progress_bar_refresh_rate: 1
   check_val_every_n_epoch: 1
   precision: 16
 
 logger:
   save_dir: "logs"
-  name: unet_effnetb0_in_float16_s512
+  name: deeplab_effnetb0_in_float16_s256
 
 checkpoint:
   monitor: valid/loss
@@ -146,8 +146,8 @@ metrics:
   - name: IntersectionOverUnionMeter
     params:
       name: IoU_mask
-      average: global
       binary_mod: true
+      average: global
       target_fields:
         target: target_mask
         prediction: prediction_mask
@@ -183,3 +183,7 @@ metrics:
       target_fields:
         target: target_label
         prediction: prediction_label
+
+
+
+

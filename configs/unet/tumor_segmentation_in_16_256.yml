@@ -15,7 +15,7 @@ task:
         params:
           num_classes: 1
     use_ema: false
-    input_size: [*num_channels, &height 256, &width 256]
+    input_size: [ *num_channels, &height 256, &width 256 ]
 
 criterion:
   criterion_list:
@@ -92,7 +92,7 @@ data:
         params:
           height: *height
           width: *width
-          scale: [0.5, 1.0]
+          scale: [ 0.5, 1.0 ]
           p: 0.5
       - &resize
         name: Resize
@@ -114,7 +114,7 @@ data:
     params:
       path_to_datalist: "data_valid.csv"
     transform:
-#      - *pad
+      #      - *pad
       - *normalize
       - *totensor
     augment:
@@ -176,6 +176,10 @@ metrics:
         target: target_label
         prediction: prediction_label
 
-
-
-
+  - name: F1Meter
+    params:
+      name: f1_label
+      num_classes: 3
+      target_fields:
+        target: target_label
+        prediction: prediction_label
