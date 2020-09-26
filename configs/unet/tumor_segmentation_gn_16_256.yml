@@ -62,7 +62,7 @@ data:
   dataset_name: TumorDataset
   common_params:
     data_folder: "../data"
-    input_dtype: float32
+    input_dtype: float16
     image_dtype: uint8
   dataloader_params:
     batch_size: 16
@@ -155,17 +155,39 @@ metrics:
   - name: IntersectionOverUnionMeter
     params:
       name: IoU_mask
-      target_class: 1
-      average: global
       binary_mod: true
+      average: global
       target_fields:
         target: target_mask
         prediction: prediction_mask
 
   - name: F1Meter
     params:
+      name: f1_meningioma
+      target_class: 0
+      target_fields:
+        target: target_label
+        prediction: prediction_label
+
+  - name: F1Meter
+    params:
+      name: f1_glioma
+      target_class: 1
+      target_fields:
+        target: target_label
+        prediction: prediction_label
+
+  - name: F1Meter
+    params:
+      name: f1_pituitary_tumor
+      target_class: 2
+      target_fields:
+        target: target_label
+        prediction: prediction_label
+
+  - name: F1Meter
+    params:
       name: f1_label
-      get_logits: true
       num_classes: 3
       target_fields:
         target: target_label
