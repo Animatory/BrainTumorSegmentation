@@ -140,8 +140,8 @@ trainer:
   precision: 16
 
 logger:
-  save_dir: "logs"
-  name: unet_effnet_b0_attn_ema
+  save_dir: "logs/tumor"
+  name: unet_effnetb0_gn_fp16_s256_attn_ema
 
 checkpoint:
   monitor: valid/loss

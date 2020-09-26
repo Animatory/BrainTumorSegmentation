@@ -6,12 +6,12 @@ task:
       in_chans: &num_channels 1
       pretrained: true
     heads:
-      - type: Unet
+      - type: DeepLabV3Plus
         name: mask
         params:
           num_classes: 5
     use_ema: false
-    input_size: [*num_channels, &height 128, &width 128]
+    input_size: [*num_channels, &height 196, &width 196]
 
 criterion:
   criterion_list:
@@ -49,11 +49,10 @@ scheduler:
     T_mult: 2
 
 data:
-  dataset_name: TumorDataset
+  dataset_name: BRATSDataset
   common_params:
     data_folder: "../data"
-    input_dtype: float32
-    image_dtype: uint16
+    input_dtype: float16
   dataloader_params:
     batch_size: 16
     num_workers: 8
@@ -126,8 +125,8 @@ trainer:
   precision: 16
 
 logger:
-  save_dir: "logs/cancer_segmentator"
-  name: unet_effnet_b0
+  save_dir: "logs/brats"
+  name: deeplab_effnetb0_in_fp16_s256
 
 checkpoint:
   monitor: valid/loss
@@ -139,21 +138,11 @@ profiler:
   save_profile: false
 
 metrics:
-  - name: IntersectionOverUnionMeter
+  - name: MeanIntersectionOverUnionMeter
     params:
-      name: IoU_mask
-      target_class: 1
+      name: mIoU_brats
+      num_classes: 5
       average: global
-      binary_mod: true
       target_fields:
         target: target_mask
         prediction: prediction_mask
-
-  - name: F1Meter
-    params:
-      name: f1_label
-      get_logits: true
-      num_classes: 3
-      target_fields:
-        target: target_label
-        prediction: prediction_label

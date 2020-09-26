@@ -38,9 +38,6 @@ class BRATSDataset(BaseDataset):
 
         if image.ndim == 2:
             image = image[..., None]
-        if image.dtype == 'uint8':
-            image = (image.astype(float) * (2 ** 8)).astype('int16')
-        mask = mask
 
         # apply augmentations
         if self.augment:

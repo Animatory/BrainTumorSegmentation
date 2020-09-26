@@ -130,8 +130,8 @@ trainer:
   precision: 16
 
 logger:
-  save_dir: "logs"
-  name: deeplab_effnetb0_in_float16_s256
+  save_dir: "logs/tumor"
+  name: deeplab_effnetb0_in_fp16_s256
 
 checkpoint:
   monitor: valid/loss
