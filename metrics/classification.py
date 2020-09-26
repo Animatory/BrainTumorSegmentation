@@ -8,157 +8,175 @@ from .metrics import Metric
 @METRICS.register_class
 class AccuracyMeter(Metric):
 
-    def __init__(self, name=None, get_logits=False, target_fields=None):
+    def __init__(self, name=None, binary_mod=False, target_fields=None):
         super().__init__('accuracy' if name is None else name, target_fields=target_fields)
-        self.get_logits = get_logits
+        self.binary_mod = binary_mod
 
     def calculate(self, target: ndarray, prediction: ndarray) -> ndarray:
-        if self.get_logits and prediction.ndim == target.ndim:
-            prediction = prediction > 0
-
-        if prediction.ndim == target.ndim + 1:
-            prediction = prediction.argmax(1)
+        if self.binary_mod:
+            tdim = target.ndim
+            pdim = prediction.ndim
+            if tdim == pdim:
+                prediction = prediction > 0
+            else:
+                raise ValueError(f'Dimension sizes for target and prediction do not match {tdim} != {pdim}')
+        else:
+            if prediction.ndim == target.ndim + 1:
+                prediction = prediction.argmax(1)
         return (target == prediction).mean()
 
 
 @METRICS.register_class
 class FbetaMeter(Metric):
-    MODES = ['macro', 'binary']
 
-    def __init__(self, num_classes, name=None, get_logits=False, average='macro',
-                 target_class=None, beta=1, target_fields=None):
+    def __init__(self, beta, num_classes=None, target_class=None, binary_mod=False, name=None,
+                 weighted=False, ignore_index=-100, reduce=True, target_fields=None):
+        if num_classes is None and target_class is None and not binary_mod:
+            raise TypeError('You must specify either `num_classes` or `target_class` or `binary_mod`')
+        if target_class is not None and binary_mod:
+            raise ValueError('`target_class` is not compatible with `binary_mod`')
+        if (target_class is not None or binary_mod) and weighted:
+            raise ValueError('`weighted` is not compatible with `binary_mod` and `target_class`')
         if name is None:
-            name = f'F_beta={beta}_{average}'
+            if target_class is None:
+                name = f'F_beta={beta}'
+            else:
+                name = f'F_beta={beta}_class={target_class}'
 
         super().__init__(name, target_fields=target_fields)
 
-        if average not in self.MODES:
-            raise ValueError(f"Invalid average setting. "
-                             f"Please choose one of {self.MODES}.")
-
-        if average == 'binary' and num_classes != 2:
-            raise ValueError(f"Target is multiclass but average='binary'. "
-                             f"Please choose another average setting, "
-                             f"one of {[mode for mode in self.MODES if mode != 'binary']}.")
-
-        self.beta_sq = beta ** 2
-        self.num_classes = num_classes
-        self.mode = average
-        self.target_class = target_class
-        self.get_logits = get_logits
-
-        if target_class is None:
-            self.true_pos = np.zeros(self.num_classes)
-            self.false_pos = np.zeros(self.num_classes)
-            self.false_neg = np.zeros(self.num_classes)
-        else:
+        self._num_classes = num_classes
+        self._target_class = target_class
+        self._binary_mod = binary_mod
+        self._weighted = weighted
+        self._ignore_index = ignore_index
+        self._reduce = reduce
+        self._beta_sq = beta ** 2
+        if self._binary_mod or self._target_class is not None:
             self.true_pos = 0
             self.false_pos = 0
             self.false_neg = 0
-
-    def calculate(self, target: ndarray, prediction: ndarray) -> (ndarray,ndarray):
-        """ Usage on mini-batch is deprecated """
-        if prediction.ndim == target.ndim + 1:
-            prediction = prediction.argmax(1)
-
-        f1_scores = np.zeros(self.num_classes)
-
-        if self.target_class is None:
-            to_iterate = range(self.num_classes)
         else:
-            to_iterate = [self.target_class]
-
-        for n in to_iterate:
-            true_n = target == n
-            pred_n = prediction == n
-            tp = (pred_n & true_n).sum()
-            fp = (pred_n & ~true_n).sum()
-            fn = (true_n & ~pred_n).sum()
-            tp_rate = (1 + self.beta_sq) * tp
-            denum = tp_rate + self.beta_sq * fn + fp
-            if denum == 0.0:
-                f1_scores[n] = 0
-            else:
-                f1_scores[n] = tp_rate / denum
-
-        if self.mode == 'binary':
-            return f1_scores[1]
-
-        elif self.mode == 'macro':
-            return f1_scores.mean()
-
-    def update(self, target, prediction, *args, **kwargs):
-        if self.get_logits and prediction.ndim == target.ndim:
-            prediction = prediction > 0
-
-        if prediction.ndim == target.ndim + 1:
-            prediction = prediction.argmax(1)
-
-        if self.target_class is None:
-            for n in range(self.num_classes):
-                true_n = target == n
-                pred_n = prediction == n
-                self.true_pos[n] += (pred_n & true_n).sum()
-                self.false_pos[n] += (pred_n & ~true_n).sum()
-                self.false_neg[n] += (true_n & ~pred_n).sum()
-        else:
-            n = self.target_class
-            true_n = target == n
-            pred_n = prediction == n
-            self.true_pos += (pred_n & true_n).sum()
-            self.false_pos += (pred_n & ~true_n).sum()
-            self.false_neg += (true_n & ~pred_n).sum()
+            self._classes_idx = np.arange(self._num_classes)[:, None]
+            self.true_pos = np.zeros(self._num_classes)
+            self.false_pos = np.zeros(self._num_classes)
+            self.false_neg = np.zeros(self._num_classes)
 
     def reset(self):
-        if self.target_class is None:
-            self.true_pos = np.zeros(self.num_classes)
-            self.false_pos = np.zeros(self.num_classes)
-            self.false_neg = np.zeros(self.num_classes)
-        else:
+        if self._binary_mod or self._target_class is not None:
             self.true_pos = 0
             self.false_pos = 0
             self.false_neg = 0
-
-    def on_epoch_end(self):
-        if self.mode == 'binary':
-            tp = self.true_pos[1]
-            fp = self.false_pos[1]
-            fn = self.false_neg[1]
-        elif self.mode == 'macro':
-            if self.target_class is None:
-                tp = self.true_pos.sum()
-                fp = self.false_pos.sum()
-                fn = self.false_neg.sum()
-            else:
-                tp = self.true_pos
-                fp = self.false_pos
-                fn = self.false_neg
-        tp_rate = (1 + self.beta_sq) * tp
-        denum = tp_rate + self.beta_sq * fn + fp
-        if denum == 0.0:
-            output = 0
         else:
-            output = tp_rate / denum
-        self.reset()
-        return output
+            self.true_pos = np.zeros(self._num_classes)
+            self.false_pos = np.zeros(self._num_classes)
+            self.false_neg = np.zeros(self._num_classes)
+
+    def _unify_shapes(self, target, prediction):
+        if self._binary_mod:
+            if prediction.shape != target.shape:
+                raise ValueError('shapes of target and prediction do not match',
+                                 target.shape, prediction.shape)
+            prediction = prediction > 0
+        else:
+            # Dimensions check
+            if prediction.shape[0] != target.shape[0]:
+                raise ValueError('Batch size of target and prediction do not match',
+                                 target.shape[0], prediction.shape[0])
+            if prediction.ndim == target.ndim + 1:
+                prediction = prediction.argmax(1)
+
+            # Dimensions check
+            if prediction.shape[1:] != target.shape[1:]:
+                raise ValueError('Spatial shapes of target and prediction do not match',
+                                 target.shape[1:], prediction.shape[1:])
+
+            if self._target_class is not None:
+                target = target == self._target_class
+                prediction = prediction == self._target_class
+
+        target = target.reshape(-1)
+        prediction = prediction.reshape(-1)
+        prediction = prediction[target != self._ignore_index]
+        target = target[target != self._ignore_index]
+        return prediction, target
+
+    def calculate(self, target: ndarray, prediction: ndarray) -> ndarray:
+        target, prediction = self._unify_shapes(target, prediction)
+
+        if self._binary_mod or self._target_class is not None:
+            pred_n = prediction
+            true_n = target
+        else:
+            true_n: np.ndarray = target == self._classes_idx
+            pred_n: np.ndarray = prediction == self._classes_idx
+        tp = (pred_n & true_n).sum(-1)
+        fp = (pred_n & ~true_n).sum(-1)
+        fn = (~pred_n & true_n).sum(-1)
+        tp_rate = (1 + self._beta_sq) * tp
+        denum = tp_rate + self._beta_sq * fn + fp
+        np.seterr(divide='ignore')
+        f1_scores = np.where(denum != 0.0, tp_rate / denum, 0)
+
+        if self._reduce:
+            if self._weighted:
+                weights = (tp + fn) / target.shape[0]
+                f1_scores = weights @ f1_scores
+            else:
+                f1_scores = np.mean(f1_scores)
+        return f1_scores
+
+    def update(self, target, prediction, *args, **kwargs):
+        target, prediction = self._unify_shapes(target, prediction)
+
+        if self._binary_mod or self._target_class is not None:
+            pred_n = prediction
+            true_n = target
+        else:
+            true_n: np.ndarray = target == self._classes_idx
+            pred_n: np.ndarray = prediction == self._classes_idx
+        self.true_pos += (pred_n & true_n).sum(-1)
+        self.false_pos += (pred_n & ~true_n).sum(-1)
+        self.false_neg += (~pred_n & true_n).sum(-1)
+
+    def on_epoch_end(self, do_reset=True):
+        tp = self.true_pos
+        fp = self.false_pos
+        fn = self.false_neg
+
+        tp_rate = (1 + self._beta_sq) * tp
+        denum = tp_rate + self._beta_sq * fn + fp
+        np.seterr(divide='ignore')
+        f1_scores = np.where(denum != 0.0, tp_rate / denum, 0)
+
+        if self._reduce:
+            if self._weighted:
+                weights = (tp + fn) / (tp + fn).sum()
+                f1_scores = weights @ f1_scores
+            else:
+                f1_scores = np.mean(f1_scores)
+        if do_reset:
+            self.reset()
+        return f1_scores
 
 
 @METRICS.register_class
 class F1Meter(FbetaMeter):
 
-    def __init__(self, num_classes, name=None, get_logits=False,
-                 average='macro', target_class=None, target_fields=None):
+    def __init__(self, num_classes=None, target_class=None, binary_mod=False, name=None, weighted=False,
+                 ignore_index=-100, reduce=True, target_fields=None):
         if name is None:
-            name = f'F1_{average}'
+            if target_class is None:
+                name = f'F1'
+            else:
+                name = f'F1_class={target_class}'
 
-        super().__init__(num_classes, name=name, get_logits=get_logits, average=average,
-                         target_class=target_class, beta=1, target_fields=target_fields)
+        super().__init__(1, num_classes, target_class, binary_mod, name, weighted,
+                         ignore_index, reduce, target_fields)
 
 
 @METRICS.register_class
 class MultiLabelFbetaMeter(Metric):
-    MODES = ['macro', 'binary']
-
     def __init__(self, num_classes, name=None, get_logits=False,
                  target_class=None, beta=1, target_fields=None):
         if name is None:
