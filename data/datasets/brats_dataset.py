@@ -21,25 +21,23 @@ class BRATSDataset(BaseDataset):
         self.transform = transform
 
     def get_raw(self, i):
-        opened, _ = load(self.csv.iloc[i].path)
-        mask, _ = load(self.csv.iloc[i].label_path)
-        
-        if self.csv.iloc[i].view == 0:
-            image = opened[self.csv.iloc[i].index,:,:]
-            mask = mask[self.csv.iloc[i].index,:,:]
-        elif self.csv.iloc[i].view == 1:
-            image = opened[:,self.csv.iloc[i].index,:]
-            mask = mask[:,self.csv.iloc[i].index,:]
+        record = self.csv.iloc[i]
+        opened, _ = load(record.path)
+        mask, _ = load(record.label_path)
+        index = record.index
+
+        if record.view == 0:
+            image = opened[index, :, :]
+            mask = mask[index, :, :]
+        elif record.view == 1:
+            image = opened[:, index, :]
+            mask = mask[:, index, :]
         else:
-            image = opened[:,:,self.csv.iloc[i].index]
-            mask = mask[:,:,self.csv.iloc[i].index]
-        
-        labels = list(set(mask.flatten().tolist())) 
+            image = opened[:, :, index]
+            mask = mask[:, :, index]
 
         if image.ndim == 2:
             image = image[..., None]
-        # if image.dtype == 'int16':
-        #     image = (image / (2 ** 8)).astype('uint8')
         if image.dtype == 'uint8':
             image = (image.astype(float) * (2 ** 8)).astype('int16')
         mask = mask
@@ -49,10 +47,10 @@ class BRATSDataset(BaseDataset):
             sample = self.augment(image=image, mask=mask)
             image, mask = sample['image'], sample['mask']
 
-        return image, mask, label
+        return image, mask
 
     def __getitem__(self, i):
-        image, mask, label = self.get_raw(i)
+        image, mask = self.get_raw(i)
 
         # apply preprocessing
         if self.transform:
@@ -61,7 +59,7 @@ class BRATSDataset(BaseDataset):
         image = image.type(torch.__dict__[self.input_dtype])
         mask = mask.type(torch.__dict__[self.input_dtype])
 
-        return {"input": image, "target_mask": mask.float(), "target_label": label}
+        return {"input": image, "mask": mask.float()}
 
     def __len__(self):
         return len(self.csv)

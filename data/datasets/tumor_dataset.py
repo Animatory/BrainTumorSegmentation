@@ -10,12 +10,13 @@ from registry import DATASETS
 @DATASETS.register_class
 class TumorDataset(BaseDataset):
 
-    def __init__(self, data_folder, path_to_datalist,
+    def __init__(self, data_folder, path_to_datalist, image_dtype='int16',
                  augment=None, transform=None, input_dtype='float32'):
         self.data_folder = Path(data_folder)
         self.csv = pd.read_csv(self.data_folder / path_to_datalist)
         self.csv['path'] = self.csv['path'].apply(lambda x: self.data_folder / x)
         self.input_dtype = input_dtype
+        self.image_dtype = image_dtype
 
         self.augment = augment
         self.transform = transform
@@ -28,11 +29,8 @@ class TumorDataset(BaseDataset):
 
         if image.ndim == 2:
             image = image[..., None]
-        # if image.dtype == 'int16':
-        #     image = (image / (2 ** 8)).astype('uint8')
-        if image.dtype == 'uint8':
-            image = (image.astype(float) * (2 ** 8)).astype('int16')
-        mask = mask
+        if self.image_dtype == 'uint8' and image.dtype == 'int16':
+            image = (image / (2 ** 8)).astype('uint8')
 
         # apply augmentations
         if self.augment:
