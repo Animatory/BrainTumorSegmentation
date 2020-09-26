@@ -153,7 +153,7 @@ class MeanIntersectionOverUnionMeter(Metric):
 
 @METRICS.register_class
 class IntersectionOverUnionMeter(MeanIntersectionOverUnionMeter):
-    def __init__(self, target_class, name=None, binary_mod=False, ignore_index=-100,
+    def __init__(self, target_class=None, name=None, binary_mod=False, ignore_index=-100,
                  reduce=True, average='global', target_fields=None):
         """Calculates intersection over union for a certain class for a semantic segmentation problem.
         The meter makes calculations based on confusion matrix
@@ -167,6 +167,8 @@ class IntersectionOverUnionMeter(MeanIntersectionOverUnionMeter):
             ``'samples'``: Calculate metric for each image separately and find
             their unweighted average.
         """
+        if binary_mod:
+            target_class = 1
         if name is None:
             name = f'IoU_class={target_class}_{average}'
 
